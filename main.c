@@ -25,6 +25,7 @@ publish any hardware using these IDs! This is for demonstration only!
 #include <avr/pgmspace.h>   /* required by usbdrv.h */
 #include "usbdrv.h"
 #include "oddebug.h"        /* This is also an example for using debug macros */
+#include "snes.h"
 
 /* ------------------------------------------------------------------------- */
 /* ----------------------------- USB interface ----------------------------- */
@@ -56,13 +57,6 @@ PROGMEM const char usbHidReportDescriptor[42] = {
 };
 
 
-/* This is the same report descriptor as seen in a Logitech mouse. The data
- * described by this descriptor consists of 4 bytes:
- *      .  .  .  .  . B2 B1 B0 .... one byte with mouse button states
- *     X7 X6 X5 X4 X3 X2 X1 X0 .... 8 bit signed relative coordinate x
- *     Y7 Y6 Y5 Y4 Y3 Y2 Y1 Y0 .... 8 bit signed relative coordinate y
- *     W7 W6 W5 W4 W3 W2 W1 W0 .... 8 bit signed relative coordinate wheel
- */
 typedef struct{
     uchar   buttonMask;
     char    X;
@@ -75,29 +69,49 @@ static report_t reportBuffer;
 
 usbMsgLen_t usbFunctionSetup(uchar data[8])
 {
-usbRequest_t    *rq = (void *)data;
-
-    // /* The following requests are never used. But since they are required by
-    //  * the specification, we implement them in this example.
-    //  */
-    // if((rq->bmRequestType & USBRQ_TYPE_MASK) == USBRQ_TYPE_CLASS){    /* class request type */
-    //     DBG1(0x50, &rq->bRequest, 1);   /* debug output: print our request */
-    //     if(rq->bRequest == USBRQ_HID_GET_REPORT){  /* wValue: ReportType (highbyte), ReportID (lowbyte) */
-    //         /* we only have one report type, so don't look at wValue */
-    //         usbMsgPtr = (void *)&reportBuffer;
-    //         return sizeof(reportBuffer);
-    //     }else if(rq->bRequest == USBRQ_HID_GET_IDLE){
-    //         usbMsgPtr = &idleRate;
-    //         return 1;
-    //     }else if(rq->bRequest == USBRQ_HID_SET_IDLE){
-    //         idleRate = rq->wValue.bytes[1];
-    //     }
-    // }else{
-    //     /* no vendor specific requests implemented */
-    // }
-    // return 0;   /* default for not implemented requests: return no data back to host */
 }
 
+void packData(report_t * report_buff){
+  uint16_t buttons=0x00;
+  report_buff->buttonMask=0;
+  report_buff->X=0;
+  report_buff->Y=0;
+  buttons=readButtons();
+  if(buttons&(1<<0)){//B
+    report_buff->buttonMask|=(1<<2);//Button 3
+  }
+  if(buttons&(1<<1)){//Y
+    report_buff->buttonMask|=(1<<3);//Button 4
+  }
+  if(buttons&(1<<2)){//Select
+    report_buff->buttonMask|=(1<<6);//Button 7
+  }
+  if(buttons&(1<<3)){//Start
+    report_buff->buttonMask|=(1<<7);//Button 8
+  }
+  if(buttons&(1<<4)){//Up
+    report_buff->Y=-126;//Button 4
+  }else if(buttons&(1<<5)){//Down
+    report_buff->Y|=126;//Button 4
+  }
+  if(buttons&(1<<6)){//Left
+    report_buff->X=-126;//Button 4
+  }else if(buttons&(1<<7)){//Right
+    report_buff->X=126;//Button 4
+  }
+  if(buttons&(1<<8)){//A
+    report_buff->buttonMask|=(1<<1);//Button 2
+  }
+  if(buttons&(1<<9)){//X
+    report_buff->buttonMask|=(1<<0);//Button 1
+  }
+  if(buttons&(1<<10)){//L
+    report_buff->buttonMask|=(1<<4);//Button 5
+  }
+  if(buttons&(1<<11)){//R
+    report_buff->buttonMask|=(1<<5);//Button 6
+  }
+}
 /* ------------------------------------------------------------------------- */
 
 int __attribute__((noreturn)) main(void)
@@ -124,16 +138,20 @@ uchar   i;
     usbDeviceConnect();
     sei();
     DBG1(0x01, 0, 0);       /* debug output: main loop starts */
+    ioInit();
     for(;;){                /* main event loop */
         DBG1(0x02, 0, 0);   /* debug output: main loop iterates */
         wdt_reset();
         usbPoll();
+
         if(usbInterruptIsReady()){
+            packData(&reportBuffer);
             /* called after every poll of the interrupt endpoint */
             //advanceCircleByFixedAngle();
             DBG1(0x03, 0, 0);   /* debug output: interrupt report prepared */
             usbSetInterrupt((void *)&reportBuffer, sizeof(reportBuffer));
         }
+
     }
 }
 
