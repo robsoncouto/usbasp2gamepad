@@ -24,7 +24,6 @@ publish any hardware using these IDs! This is for demonstration only!
 
 #include <avr/pgmspace.h>   /* required by usbdrv.h */
 #include "usbdrv.h"
-#include "oddebug.h"        /* This is also an example for using debug macros */
 #include "snes.h"
 
 /* ------------------------------------------------------------------------- */
@@ -127,7 +126,6 @@ uchar   i;
      * additional hardware initialization.
      */
     odDebugInit();
-    DBG1(0x00, 0, 0);       /* debug output: main starts */
     usbInit();
     usbDeviceDisconnect();  /* enforce re-enumeration, do this while interrupts are disabled! */
     i = 0;
@@ -137,22 +135,16 @@ uchar   i;
     }
     usbDeviceConnect();
     sei();
-    DBG1(0x01, 0, 0);       /* debug output: main loop starts */
     ioInit();
     for(;;){                /* main event loop */
-        DBG1(0x02, 0, 0);   /* debug output: main loop iterates */
         wdt_reset();
         usbPoll();
-
         if(usbInterruptIsReady()){
+            //calls the function to read the data from the joypad and make the report
             packData(&reportBuffer);
             /* called after every poll of the interrupt endpoint */
-            //advanceCircleByFixedAngle();
-            DBG1(0x03, 0, 0);   /* debug output: interrupt report prepared */
             usbSetInterrupt((void *)&reportBuffer, sizeof(reportBuffer));
         }
 
     }
 }
-
-/* ------------------------------------------------------------------------- */
