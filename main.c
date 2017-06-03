@@ -125,7 +125,6 @@ uchar   i;
      * That's the way we need D+ and D-. Therefore we don't need any
      * additional hardware initialization.
      */
-    odDebugInit();
     usbInit();
     usbDeviceDisconnect();  /* enforce re-enumeration, do this while interrupts are disabled! */
     i = 0;
